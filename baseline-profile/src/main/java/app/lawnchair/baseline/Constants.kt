@@ -1,5 +1,5 @@
 package app.lawnchair.baseline
 
 object Constants {
-    val PACKAGE_NAME = "app.lawnchair"
+    const val PACKAGE_NAME: String = "ch.deletescape.lawnchair.plah"
 }
