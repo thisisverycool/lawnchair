@@ -1,0 +1,62 @@
+name: Baseline profile generation
+
+on:
+  # Every Monday at 00:00
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+  push:
+  pull_request:
+    paths:
+      - 'benchmark/**'
+      - '.github/workflows/baseline-profile.yml'
+
+jobs:
+  baseline-profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-disabled: true
+      - name: Write sign info
+        if: github.repository_owner == 'LawnchairLauncher'
+        run: |
+          if [ ! -z "${{ secrets.KEYSTORE }}" ]; then
+            echo storePassword='${{ secrets.KEYSTORE_PASSWORD }}' >> keystore.properties
+            echo keyAlias='${{ secrets.KEY_ALIAS }}' >> keystore.properties
+            echo keyPassword='${{ secrets.KEY_PASSWORD }}' >> keystore.properties
+            echo storeFile='${{ github.workspace }}/key.jks' >> keystore.properties
+            echo ${{ secrets.KEYSTORE }} | base64 --decode > ${{ github.workspace }}/key.jks
+          fi
+      - name: Accept Android SDK licenses
+        run: yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses
+      - name: Clear Gradle Managed Devices
+        run: ./gradlew cleanManagedDevices
+      - name: Generate baseline profile on Gradle Managed Device
+        run: |
+          ./gradlew generateLawnWithQuickstepMarketReleaseBaselineProfile
+      - name: Commit baseline profile into main
+        # if: github.ref == 'refs/heads/main'
+        run: |
+          # If the baseline profile has changed, commit it
+          if [[ $(git diff --stat src) != '' ]]; then
+            git config user.name github-actions
+            git config user.email github-actions@github.com
+            git add src
+            git commit -m "Update app baseline profile"
+            git pull --rebase
+            git push
+          fi
