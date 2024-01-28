@@ -51,11 +51,12 @@ jobs:
       - name: Commit baseline profile into main
         # if: github.ref == 'refs/heads/main'
         run: |
+          mv -f src/lawnWithQuickstepMarketRelease/generated/baselineProfiles/baseline-prof.txt src/generated/baselineProfiles
+          git add src
           # If the baseline profile has changed, commit it
           if [[ $(git diff --stat src) != '' ]]; then
             git config user.name github-actions
             git config user.email github-actions@github.com
-            git add src
             git commit -m "Update app baseline profile"
             git pull --rebase
             git push
